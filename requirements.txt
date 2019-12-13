@@ -1,1 +1,2 @@
 mrjob
+more_itertools
