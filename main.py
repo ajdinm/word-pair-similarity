@@ -26,18 +26,19 @@ class MRWordPairDistance(MRJob):
                           )  # trivial article removal
 
         # generate all possible word frames
-        # for each unique word, we find all words to the right of it and create a such pair
+        # for each unique word, we find all words to the right of it and create a such frame
+        
         # note that this approach ignores last word in the line as it is the rightmost word (hence clean_line[:-1])
         words = set(clean_line)  # extract list of unique words
         frames = {
             word: list(
                 map(lambda i: clean_line[i+1], locate(clean_line[:-1], lambda w: w == word)))  # locate returns indices of specific word W in the array
-            # for each such index, i,  we take word clean_line[i+1] and create pair (W, clean_line[i+1])
+            # for each such index, i,  we take word clean_line[i+1] and create frame (W, clean_line[i+1])
             for word in words
         }
         return frames
 
-    # generate all possible frames from line foreach pair emit (second_word, first_word)
+    # generate all possible frames from line foreach frame emit (second_word, first_word)
     def map_second_word(self, _, line):
         for first_word, second_words in self.split_line(line).items():
             for second_word in second_words:
@@ -45,28 +46,28 @@ class MRWordPairDistance(MRJob):
 
     def reduce_second_word(self, second_word, first_words):
         # parameters of this reducer are as follows (word, first_words), where
-        # first_words is array of all words that create (w_i, word) pairs
+        # first_words is array of all words that create (w_i, word) frames
         first_words = list(first_words)
         # all occurrences of word in the input set is simply length of first_words array
         total_second_word_count = len(first_words)
         for first_word in first_words:
-             # key of this reducer's out is pair that occurred in document
-             # which ensures that future reducer is invoked once for each pair generated from input set
-             # value is number of occurrences of second word of the pair i.e. B in original formula
+             # key of this reducer's out is frame that occurred in document
+             # which ensures that future reducer is invoked once for each frame generated from input set
+             # value is number of occurrences of second word of the frame i.e. B in original formula
             yield((first_word, second_word), total_second_word_count)
 
-    def map_identity(self, pair, total_second_word_count):
-        yield(pair, total_second_word_count)  # identity mapper
+    def map_identity(self, frame, total_second_word_count):
+        yield(frame, total_second_word_count)  # identity mapper
 
-    def reduce_metric(self, pair, counts):
-        # key is pair we want to calculate Jaccard metric of
-        # value is array of elements, where each element is equal to number of times second word of the pair occurs in input set (i.e. A in the original formula)
+    def reduce_metric(self, frame, counts):
+        # key is frame we want to calculate Jaccard metric of
+        # value is array of elements, where each element is equal to number of times second word of the frame occurs in input set (i.e. A in the original formula)
         counts = list(counts)
-        # number of times specific pair (i.e. A in the original formula) occurred is equal to number of elements in the array
-        pair_count = len(counts)
+        # number of times specific frame (i.e. A in the original formula) occurred is equal to number of elements in the array
+        frame_count = len(counts)
         # since all elements here are the same, we take any of them and calculate Jaccard similary as value of this reducer's output
         word_count = counts[0]
-        yield(' '.join(pair), pair_count/word_count)
+        yield(' '.join(frame), frame_count/word_count)
 
     def steps(self):
         # combine aforementioned info final algorithm
